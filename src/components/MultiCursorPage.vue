@@ -1,5 +1,5 @@
 <script setup>
-import { h, ref } from "vue"
+import { h } from "vue"
 import { NUpload, NUploadDragger, NIcon, NText, NP, NInput, NSpace, NImage, NButton, NSelect, NDataTable, NGrid, NGi } from 'naive-ui'
 import { FileTray, Download } from "@vicons/ionicons5"
 import { parseGIF, decompressFrames } from 'gifuct-js'
@@ -133,8 +133,6 @@ const renderLabel = (option) => {
     ]
 }
 
-var observer = new MutationObserver(() => { })
-
 export default {
     data() {
         var _this = this
@@ -182,8 +180,7 @@ export default {
             ],
             cssText: '',
             jsText: '',
-            previewCssText: '',
-            previewJsText: ''
+            previewCssText: ''
         }
     },
     methods: {
@@ -283,7 +280,7 @@ export default {
 
                 //以下是为预览生成的css,这个css会被应用到预览区域
 
-                this.previewCssText += `#preview{cursor: url(${cursor.frameCanvases[0].toDataURL('image/png')}),${cursorType};-webkit-animation: cursor_${cursorName} ${cursorDuration}ms infinite;animation: cursor_${cursorName} ${cursorDuration}ms infinite;}`
+                this.previewCssText += `.cursor-${cursor.cursorType}{cursor: url(${cursor.frameCanvases[0].toDataURL('image/png')}),${cursorType};-webkit-animation: cursor_${cursorName} ${cursorDuration}ms infinite;animation: cursor_${cursorName} ${cursorDuration}ms infinite;}`
 
                 let previewKeyframesText = ''
 
@@ -298,14 +295,11 @@ export default {
         },
 
         generateJs() {
-            this.jsText = `var observer = new MutationObserver(function (mutationsList, observer) {
-    for (const mutation of mutationsList) {
-        if (mutation.type === 'childList') {
-            mutation.addedNodes.forEach(function (node) {
-                if (node instanceof Element) {
-                    const computedStyle = window.getComputedStyle(node)
-                    const cursorType = computedStyle.getPropertyValue('cursor')
-                    switch (cursorType) {`
+            this.jsText = `function traverseAndSetCursor(node) {
+    if (node instanceof Element) {
+        const computedStyle = window.getComputedStyle(node);
+        const cursorType = computedStyle.getPropertyValue('cursor')
+        switch (cursorType) {`
             this.previewJsText = this.jsText
 
             for (let i = 0; i < this.cursorList.length; i++) {
@@ -326,49 +320,49 @@ export default {
                 //以下是为用户生成的js
 
                 this.jsText += `
-                        case '${cursorType}':
-                                node.style.cursor = 'url(${cursorName}_0.png)'
-                                node.style.animation = 'cursor_${cursorName} ${cursorDuration}ms infinite'
-                                node.style.webkitAnimation = 'cursor_${cursorName} ${cursorDuration}ms infinite'
-                            break`
-
-                //以下是为预览生成的js,这个js会被应用到预览区域
-
-                this.previewJsText += `
-                        case '${cursorType}':
-                                node.style.cursor = 'url(${cursor.frameCanvases[0].toDataURL('image/png')})'
-                                node.style.animation = 'cursor_${cursorName} ${cursorDuration}ms infinite'
-                                node.style.webkitAnimation = 'cursor_${cursorName} ${cursorDuration}ms infinite'
-                            break`
+            case '${cursorType}':
+                    node.style.cursor = 'url(${cursorName}_0.png)'
+                    node.style.animation = 'cursor_${cursorName} ${cursorDuration}ms infinite'
+                    node.style.webkitAnimation = 'cursor_${cursorName} ${cursorDuration}ms infinite'
+                break`
             }
 
             const lastJs = `
-                        default:
-                            break
-                    }
-                }
-            })
+            default:
+                break
+        }
+        Array.from(node.children).forEach(child => traverseAndSetCursor(child))
+    }
+}
+
+const observer = new MutationObserver(function (mutationsList, observer) {
+    for (const mutation of mutationsList) {
+        if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach(node => traverseAndSetCursor(node))
         }
     }
+    observer.disconnect()
 })
 observer.observe(document.body, { childList: true, subtree: true })`
             this.jsText += lastJs
-            this.previewJsText += lastJs
         },
 
         setPreview() {
             const link = document.createElement('link')
             link.rel = 'stylesheet'
             link.type = 'text/css'
+            link.id = 'previewCss'
 
             const cssTextBase64 = btoa(this.previewCssText)
             const dataUrl = `data:text/css;base64,${cssTextBase64}`
 
             link.href = dataUrl
-            document.head.appendChild(link)
 
-            observer.disconnect()
-            eval(this.previewJsText)
+            var cssToRemove = document.getElementById('previewCss')
+            if (cssToRemove) {
+                cssToRemove.parentNode.removeChild(cssToRemove)
+            }
+            document.head.appendChild(link)
         },
 
         download() {
