@@ -4,7 +4,7 @@
 
 ## 试用地址
 
-
+[https://xyh20180101.github.io/gif-cursor](https://xyh20180101.github.io/gif-cursor)
 
 ## 使用方法
 
