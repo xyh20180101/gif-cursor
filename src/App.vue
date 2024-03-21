@@ -7,7 +7,7 @@ import MultiCursorPage from './components/MultiCursorPage.vue'
 
 <template>
   <n-config-provider :theme="theme">
-    <span style="display: flex;justify-content: center;margin-bottom: 32px;">将gif动态图片转为纯css/js，而无需引入npm包</span>
+    <span style="display: flex;justify-content: center;margin-bottom: 32px;">将 gif 指针转为纯 css / js 实现，而无需引入npm包</span>
     <n-tabs justify-content="space-evenly" animated>
       <n-tab-pane name="chap1" display-directive="show" tab="单一指针（全局）">
         <SingleCursorPage />
@@ -30,7 +30,7 @@ export default {
 </script>
 
 <style>
-.n-tab-pane{
+.n-tab-pane {
   padding-top: 16px !important;
 }
 </style>

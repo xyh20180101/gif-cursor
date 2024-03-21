@@ -1,7 +1,7 @@
 <script setup>
 import { h } from "vue"
-import { NUpload, NUploadDragger, NIcon, NText, NP, NInput, NSpace, NImage, NButton, NSelect, NDataTable, NGrid, NGi } from 'naive-ui'
-import { FileTray, Download } from "@vicons/ionicons5"
+import { NUpload, NUploadDragger, NIcon, NText, NP, NInput, NSpace, NImage, NButton, NSelect, NDataTable, NGrid, NGi, NTooltip, NPopconfirm } from 'naive-ui'
+import { FileTray, Download, InformationCircle } from "@vicons/ionicons5"
 import { parseGIF, decompressFrames } from 'gifuct-js'
 import '../jszip.min.js'
 </script>
@@ -27,25 +27,31 @@ import '../jszip.min.js'
     <n-data-table style="margin-top:8px" :columns="columns" :data="cursorList" :row-key="() => 'cursorName'" />
 
     <div style="width:100%;display:flex;justify-content:right">
-        <n-button :disabled="!isUpload" style="margin:8px 0 4px 0" type="error" strong @click="remove">清空</n-button>
+        <n-popconfirm negative-text="取消" positive-text="确认" :show-icon="false" @positive-click="remove">
+            <template #trigger>
+                <n-button :disabled="!isUpload" class="t" type="error" strong>清空</n-button>
+            </template>
+            确认清空？
+        </n-popconfirm>
+
     </div>
 
     <n-grid x-gap="12" :cols="2">
         <n-gi>
-            <div style="margin:8px 0 4px 0">css</div>
+            <div class="t">css</div>
             <n-input :disabled="!isUpload" :autosize="{ minRows: 15, maxRows: 15 }" v-model:value="cssText" type="textarea"
                 readonly placeholder="" />
         </n-gi>
         <n-gi>
-            <div style="margin:8px 0 4px 0">js</div>
+            <div class="t">js</div>
             <n-input :disabled="!isUpload" :autosize="{ minRows: 15, maxRows: 15 }" v-model:value="jsText" type="textarea"
                 readonly placeholder="" />
         </n-gi>
     </n-grid>
 
-    <div style="margin:8px 0 4px 0">预览区域</div>
+    <div class="t">预览区域</div>
 
-    <div id="preview">
+    <div>
         <n-space style="gap:0" v-for="g in cursorTypeOptions">
             <n-button :class="'cursor-' + t.value" style="margin:4px" v-for="t in g.children">{{ t.label }}</n-button>
         </n-space>
@@ -57,7 +63,7 @@ import '../jszip.min.js'
                 <Download />
             </n-icon>
         </template>
-        打包下载（png拆分和样式文件）
+        打包下载（ png、css、js）
     </n-button>
 </template>
 
@@ -65,7 +71,7 @@ import '../jszip.min.js'
 var cursorTypeOptions = [
     {
         type: 'group', label: '通常', key: 'general', children: [
-            { label: 'default', value: 'default' }
+            { label: 'default | auto | empty', value: 'default' }
         ]
     },
     {
@@ -141,24 +147,25 @@ export default {
             fileList: [],
             cursorList: [],
             columns: [
-                { title: '指针名称', key: 'cursorName' },
+                { title: '指针名称', minWidth: 100, key: 'cursorName' },
                 {
-                    title: '帧列表', key: 'frameCanvases', render(row) {
+                    title: '帧列表', minWidth: 100, key: 'frameCanvases', render(row) {
                         return h(NSpace, {}, row.frameCanvases.map((f) => {
                             return h(NImage, {
-                                width: f.width,
-                                height: f.height,
-                                maxwidth: 100,
+                                objectFit: 'contain',
+                                width: f.width > 64 ? 64 : f.width,
+                                height: f.height > 64 ? 64 : f.height,
                                 src: f.toDataURL()
                             }, {})
                         }))
                     }
                 },
                 {
-                    title: '指针类型', key: 'cursorType', render(row) {
+                    title: '指针类型', minWidth: 100, key: 'cursorType', render(row) {
                         return h(NSelect,
                             {
                                 value: row.cursorType,
+                                consistentMenuWidth: false,
                                 options: cursorTypeOptions,
                                 renderLabel: renderLabel,
                                 onUpdateValue: (v) => { row.cursorType = v; _this.generateCss(); _this.generateJs(); _this.setPreview(); }
@@ -166,7 +173,7 @@ export default {
                     }
                 },
                 {
-                    title: '动画时长', key: 'cursorDuration', render(row) {
+                    title: '动画时长(ms)', minWidth: 100, key: 'cursorDuration', render(row) {
                         return h(NInput,
                             {
                                 value: row.cursorDuration,
@@ -177,6 +184,45 @@ export default {
                             }, {})
                     }
                 },
+                {
+                    title(column) {
+                        return h('div', { style: 'display:flex;align-items:center' }, [h(
+                            'span',
+                            {
+                            },
+                            { default: () => '热点坐标(X, Y)' }
+                        ),
+                        h(NTooltip, null, {
+                            trigger: h(
+                                NIcon,
+                                {
+                                    size: 16
+                                },
+                                h(InformationCircle)
+                            ),
+                            default: '与 cur 指针中的热点概念相同（即指针的尖端），对于热点不在(0,0)的指针你需要手动设置'
+                        })])
+                    },
+                    minWidth: 100,
+                    key: 'cursorHotpoint', render(row) {
+                        return h(NSpace, { wrap: false }, [
+                            h(NInput, {
+                                value: row.cursorHotpoint[0],
+                                type: 'text',
+                                allowInput: 'onlyAllowNumber',
+                                placeholder: '',
+                                onInput: (v) => { row.cursorHotpoint[0] = v; _this.generateCss(); _this.generateJs(); _this.setPreview(); }
+                            }, {}),
+                            h(NInput, {
+                                value: row.cursorHotpoint[1],
+                                type: 'text',
+                                allowInput: 'onlyAllowNumber',
+                                placeholder: '',
+                                onInput: (v) => { row.cursorHotpoint[1] = v; _this.generateCss(); _this.generateJs(); _this.setPreview(); }
+                            }, {})
+                        ])
+                    }
+                }
             ],
             cssText: '',
             jsText: '',
@@ -214,6 +260,7 @@ export default {
                     cursorName: '',
                     cursorType: 'default',
                     cursorDuration: 0,
+                    cursorHotpoint: [0, 0],
                     frames: [],
                     frameCanvases: []
                 }
@@ -260,32 +307,36 @@ export default {
 
                 //指针样式
                 const cursorType = cursor.cursorType
-                console.log(cursorType)
 
                 //指针动画时长
                 const cursorDuration = cursor.cursorDuration
+
+                //热点坐标
+                const cursorHotpoint = cursor.cursorHotpoint
 
                 //动画步长百分比
                 const step = 100 / (cursor.frames.length - 1)
 
                 //以下是为用户生成的css
 
+                this.cssText += `.gif-cursor-${cursorType} ${cursorType === 'default' ? ',html ' : ''}{cursor: url(${cursorName}_0.png) ${cursorHotpoint[0]} ${cursorHotpoint[1]}, ${cursorType};-webkit-animation: cursor_${cursorName} ${cursorDuration}ms infinite;animation: cursor_${cursorName} ${cursorDuration}ms infinite;}`
+
                 let keyframesText = ''
 
                 for (let i = 0; i < cursor.frames.length; i++) {
-                    keyframesText += `${(step * i).toFixed(2)}%{cursor:url(${cursorName}_${i}.png),${cursorType};}`
+                    keyframesText += `${(step * i).toFixed(2)}%{cursor:url(${cursorName}_${i}.png) ${cursorHotpoint[0]} ${cursorHotpoint[1]}, ${cursorType};}`
                 }
 
                 this.cssText += `@-webkit-keyframes cursor_${cursorName} {${keyframesText}} @keyframes cursor_${cursorName} {${keyframesText}}`
 
                 //以下是为预览生成的css,这个css会被应用到预览区域
 
-                this.previewCssText += `.cursor-${cursor.cursorType}{cursor: url(${cursor.frameCanvases[0].toDataURL('image/png')}),${cursorType};-webkit-animation: cursor_${cursorName} ${cursorDuration}ms infinite;animation: cursor_${cursorName} ${cursorDuration}ms infinite;}`
+                this.previewCssText += `.cursor-${cursor.cursorType}{cursor: url(${cursor.frameCanvases[0].toDataURL('image/png')}) ${cursorHotpoint[0]} ${cursorHotpoint[1]}, ${cursorType};-webkit-animation: cursor_${cursorName} ${cursorDuration}ms infinite;animation: cursor_${cursorName} ${cursorDuration}ms infinite;}`
 
                 let previewKeyframesText = ''
 
                 for (let i = 0; i < cursor.frames.length; i++) {
-                    previewKeyframesText += `${(step * i).toFixed(2)}%{cursor:url(${cursor.frameCanvases[i].toDataURL('image/png')}),${cursorType};}`
+                    previewKeyframesText += `${(step * i).toFixed(2)}%{cursor:url(${cursor.frameCanvases[i].toDataURL('image/png')}) ${cursorHotpoint[0]} ${cursorHotpoint[1]}, ${cursorType};}`
                 }
 
                 this.previewCssText += `@-webkit-keyframes cursor_${cursorName} {${previewKeyframesText}} @keyframes cursor_${cursorName} {${previewKeyframesText}}`
@@ -297,7 +348,7 @@ export default {
         generateJs() {
             this.jsText = `function traverseAndSetCursor(node) {
     if (node instanceof Element) {
-        const computedStyle = window.getComputedStyle(node);
+        const computedStyle = window.getComputedStyle(node)
         const cursorType = computedStyle.getPropertyValue('cursor')
         switch (cursorType) {`
             this.previewJsText = this.jsText
@@ -314,16 +365,22 @@ export default {
                 //指针动画时长
                 const cursorDuration = cursor.cursorDuration
 
+                //热点坐标
+                const cursorHotpoint = cursor.cursorHotpoint
+
                 //动画步长百分比
                 const step = 100 / (cursor.frames.length - 1)
 
                 //以下是为用户生成的js
 
+                if (cursorType === 'default')
+                    this.jsText += `
+            case '':
+            case 'auto':`
+
                 this.jsText += `
             case '${cursorType}':
-                    node.style.cursor = 'url(${cursorName}_0.png)'
-                    node.style.animation = 'cursor_${cursorName} ${cursorDuration}ms infinite'
-                    node.style.webkitAnimation = 'cursor_${cursorName} ${cursorDuration}ms infinite'
+                    node.classList.add('gif-cursor-${cursorType}')
                 break`
             }
 
@@ -371,26 +428,23 @@ observer.observe(document.body, { childList: true, subtree: true })`
                 for (var j = 0; j < this.cursorList[i].frameCanvases.length; j++) {
                     const canvas = this.cursorList[i].frameCanvases[j]
                     const dataUrl = canvas.toDataURL('image/png')
-                    zip.file(`${this.cursorList[i].cursorName}_${j}.png`, dataUrl.substr(dataUrl.indexOf(',') + 1), { base64: true })
+                    zip.file(`cursors/${this.cursorList[i].cursorName}_${j}.png`, dataUrl.substr(dataUrl.indexOf(',') + 1), { base64: true })
                 }
             }
 
-
-            zip.file('cursor.css', this.cssText)
-            zip.file('cursor.js', this.jsText)
+            zip.file('cursors/cursor.css', this.cssText)
+            zip.file('cursors/cursor.js', this.jsText)
 
             zip.generateAsync({ type: 'blob' })
                 .then(blob => {
-                    // 创建一个下载链接
                     const downloadLink = document.createElement('a')
                     downloadLink.href = URL.createObjectURL(blob)
                     downloadLink.download = 'cursors.zip'
 
-                    // 模拟点击触发下载
                     document.body.appendChild(downloadLink)
                     downloadLink.click()
                     document.body.removeChild(downloadLink)
-                });
+                })
         },
 
         ///以下是辅助方法
@@ -421,6 +475,10 @@ observer.observe(document.body, { childList: true, subtree: true })`
 </script>
 
 <style>
+.t {
+    margin: 8px 0 4px 0;
+}
+
 .n-base-select-option {
     align-items: stretch !important;
 }

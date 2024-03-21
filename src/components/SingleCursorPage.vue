@@ -1,7 +1,7 @@
 <script setup>
 import { h } from "vue"
-import { NUpload, NUploadDragger, NIcon, NText, NP, NInput, NSpace, NImage, NButton, NSelect, useMessage } from 'naive-ui'
-import { FileTray, Download } from "@vicons/ionicons5"
+import { NUpload, NUploadDragger, NIcon, NText, NP, NInput, NSpace, NImage, NButton, NTooltip } from 'naive-ui'
+import { FileTray, Download, InformationCircle } from "@vicons/ionicons5"
 import { parseGIF, decompressFrames } from 'gifuct-js'
 import '../jszip.min.js'
 </script>
@@ -23,25 +23,46 @@ import '../jszip.min.js'
         </n-upload-dragger>
     </n-upload>
 
-    <div style="margin:8px 0 4px 0">帧列表</div>
+    <div class="t">帧列表</div>
 
     <n-space>
-        <n-image v-for="c in frameCanvases" :width="c.width" :height="c.height" maxwidth="100" :src="c.toDataURL()" />
+        <n-image v-for="c in frameCanvases" object-fit="contain" :width="c.width > 64 ? 64 : c.width"
+            :height="c.height > 64 ? 64 : c.height" :src="c.toDataURL()" />
     </n-space>
 
-    <div style="margin:8px 0 4px 0">动画时长(ms)</div>
+    <div class="t">动画时长(ms)</div>
+    <n-space>
+        <n-input :disabled="!isUpload" type="text" :allow-input="onlyAllowNumber" placeholder=""
+            v-model:value="cursorDuration" @input="() => { generateCss(); setPreview(); }" />
+    </n-space>
 
-    <n-input :disabled="!isUpload" type="text" :allow-input="onlyAllowNumber" placeholder="只能输入数字"
-        v-model:value="cursorDuration" @input="() => { generateCss(); setPreview(); }" />
+    <div class="t" style="display:flex;align-items:center">
+        <span>热点坐标(X, Y)</span>
+        <n-tooltip>
+            <template #trigger>
+                <n-icon size="16">
+                    <InformationCircle />
+                </n-icon>
+            </template>
+            与 cur 指针中的热点概念相同（即指针的尖端），对于热点不在(0,0)的指针你需要手动设置
+        </n-tooltip>
+    </div>
 
-    <div style="margin:8px 0 4px 0">css</div>
+    <n-space>
+        <n-input :disabled="!isUpload" type="text" :allow-input="onlyAllowNumber" placeholder=""
+            v-model:value="cursorHotpoint[0]" @input="() => { generateCss(); setPreview(); }" />
+        <n-input :disabled="!isUpload" type="text" :allow-input="onlyAllowNumber" placeholder=""
+            v-model:value="cursorHotpoint[1]" @input="() => { generateCss(); setPreview(); }" />
+    </n-space>
+
+    <div class="t">css</div>
 
     <n-input :disabled="!isUpload" :autosize="{ minRows: 15, maxRows: 15 }" v-model:value="cssText" type="textarea"
         readonly />
 
-    <div style="margin:8px 0 4px 0">预览区域</div>
+    <div class="t">预览区域</div>
 
-    <div id="preview1" style="width: 100%; height: 50px;border-radius:3px;border: 1px solid rgb(224, 224, 230);"></div>
+    <div id="preview" style="width: 100%; height: 50px;border-radius:3px;border: 1px solid rgb(224, 224, 230);"></div>
 
     <n-button :disabled="!isUpload" style="margin:8px 0 4px 0;width: 100%;" secondary strong @click="download">
         <template #icon>
@@ -49,11 +70,13 @@ import '../jszip.min.js'
                 <Download />
             </n-icon>
         </template>
-        打包下载（png拆分和样式文件）
+        打包下载（png、css）
     </n-button>
 </template>
 
 <script>
+const onlyAllowNumber = (value) => !value || /^\d+$/.test(value)
+
 export default {
     data() {
         return {
@@ -61,6 +84,7 @@ export default {
             file: null,
             cursorName: '',
             cursorType: 'default',
+            cursorHotpoint: [0, 0],
             cursorDuration: 0,
             cursorTypeOptions: [
                 {
@@ -150,6 +174,7 @@ export default {
             this.cursorName = ''
             this.cursorType = 'default'
             this.cursorDuration = 0
+            this.cursorHotpoint = [0, 0]
             this.frames = []
             this.frameCanvases = []
             this.cssText = ''
@@ -169,7 +194,6 @@ export default {
                     _this.frameCanvases.push(_this.getCanvasFromFrame(frame))
                 })
 
-                console.log(_this.frames)
                 _this.cursorName = _this.removeFileExtension(_this.file.name)
                 _this.cursorDuration = _this.frames[0].delay * _this.frames.length
                 _this.generateCss()
@@ -200,22 +224,24 @@ export default {
 
             //指针样式
             const cursorType = this.cursorType
-            console.log(cursorType)
 
             //指针动画时长
             const cursorDuration = this.cursorDuration
+
+            //热点坐标
+            const cursorHotpoint = this.cursorHotpoint
 
             //动画步长百分比
             const step = 100 / (this.frames.length - 1)
 
             //以下是为用户生成的css
 
-            this.cssText = `*{cursor: url(${cursorName}_0.png);-webkit-animation: cursor_${cursorName} ${cursorDuration}ms infinite;animation: cursor_${cursorName} ${cursorDuration}ms infinite;}`
+            this.cssText = `*{cursor: url(${cursorName}_0.png) ${cursorHotpoint[0]} ${cursorHotpoint[1]}, ${cursorType};-webkit-animation: cursor_${cursorName} ${cursorDuration}ms infinite;animation: cursor_${cursorName} ${cursorDuration}ms infinite;}`
 
             let keyframesText = ''
 
             for (var i = 0; i < this.frames.length; i++) {
-                keyframesText += `${(step * i).toFixed(2)}%{cursor:url(${cursorName}_${i}.png),${cursorType};}`
+                keyframesText += `${(step * i).toFixed(2)}%{cursor:url(${cursorName}_${i}.png) ${cursorHotpoint[0]} ${cursorHotpoint[1]}, ${cursorType};}`
             }
 
             this.cssText += `@-webkit-keyframes cursor_${cursorName} {${keyframesText}} @keyframes cursor_${cursorName} {${keyframesText}}`
@@ -224,12 +250,12 @@ export default {
 
             //以下是为预览生成的css,这个css会被应用到预览区域
 
-            this.previewCssText = `#preview1{cursor: url(${this.frameCanvases[0].toDataURL('image/png')}),${cursorType};-webkit-animation: cursor_${cursorName} ${cursorDuration}ms infinite;animation: cursor_${cursorName} ${cursorDuration}ms infinite;}`
+            this.previewCssText = `#preview{cursor: url(${this.frameCanvases[0].toDataURL('image/png')}) ${cursorHotpoint[0]} ${cursorHotpoint[1]},${cursorType};-webkit-animation: cursor_${cursorName} ${cursorDuration}ms infinite;animation: cursor_${cursorName} ${cursorDuration}ms infinite;}`
 
             let previewKeyframesText = ''
 
             for (var i = 0; i < this.frames.length; i++) {
-                previewKeyframesText += `${(step * i).toFixed(2)}%{cursor:url(${this.frameCanvases[i].toDataURL('image/png')}),${cursorType};}`
+                previewKeyframesText += `${(step * i).toFixed(2)}%{cursor:url(${this.frameCanvases[i].toDataURL('image/png')}) ${cursorHotpoint[0]} ${cursorHotpoint[1]}, ${cursorType};}`
             }
 
             this.previewCssText += `@-webkit-keyframes cursor_${cursorName} {${previewKeyframesText}} @keyframes cursor_${cursorName} {${previewKeyframesText}}`
@@ -253,23 +279,21 @@ export default {
             for (var i = 0; i < this.frameCanvases.length; i++) {
                 const canvas = this.frameCanvases[i]
                 const dataUrl = canvas.toDataURL('image/png')
-                zip.file(`${this.cursorName}_${i}.png`, dataUrl.substr(dataUrl.indexOf(',') + 1), { base64: true })
+                zip.file(`cursors/${this.cursorName}_${i}.png`, dataUrl.substr(dataUrl.indexOf(',') + 1), { base64: true })
             }
 
-            zip.file('cursor.css', this.cssText)
+            zip.file('cursors/cursor.css', this.cssText)
 
             zip.generateAsync({ type: 'blob' })
                 .then(blob => {
-                    // 创建一个下载链接
                     const downloadLink = document.createElement('a')
                     downloadLink.href = URL.createObjectURL(blob)
-                    downloadLink.download = `${this.cursorName}.zip`
+                    downloadLink.download = 'cursors.zip'
 
-                    // 模拟点击触发下载
                     document.body.appendChild(downloadLink)
                     downloadLink.click()
                     document.body.removeChild(downloadLink)
-                });
+                })
         },
 
         ///以下是辅助方法
@@ -300,6 +324,10 @@ export default {
 </script>
 
 <style>
+.t {
+    margin: 8px 0 4px 0;
+}
+
 .n-base-select-option {
     align-items: stretch !important;
 }
