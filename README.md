@@ -8,28 +8,31 @@
 
 ## 使用方法
 
-### html
+1. 部署本项目或通过上面试用地址打开工具，导入你需要转换的gif，编辑和预览确认之后下载打包文件
+2. 将下载的文件引入到你的项目，方法如下：
 
-```html
-<html>
-    <head>
-        <!-- css放哪都行 -->
-        <link rel="stylesheet" href="./cursors/cursor.css">
-    </head>
-    <body>
-        <!-- 如果有js，则放在body的开头 -->
-        <script src="./cursors/cursor.js"></script>
-    </body>
-</html>
-```
+    ### html
 
-### vue或其他
+    ```html
+    <html>
+        <head>
+            <!-- css放哪都行 -->
+            <link rel="stylesheet" href="./cursors/cursor.css">
+        </head>
+        <body>
+            <!-- 如果有js，则放在body的开头 -->
+            <script src="./cursors/cursor.js"></script>
+        </body>
+    </html>
+    ```
 
-```js
-// 我不怎么写前端，关于动态指针你去npm上找找应该有更好的轮子
-import './cursors/cursor.css'
-import './cursors/cursor.js'
-```
+    ### vue或其他
+    
+    ```js
+    // 我不怎么写前端，关于动态指针你去npm上找找应该有更好的轮子
+    import './cursors/cursor.css'
+    import './cursors/cursor.js'
+    ```
 
 ## 注意事项
 
